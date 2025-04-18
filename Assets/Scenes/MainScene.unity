@@ -1,0 +1,50 @@
+// This is a Unity scene file. In an actual Unity project, scenes are binary files.
+// Here's a description of what this scene would contain:
+
+/*
+MainScene:
+
+1. Camera:
+   - Main Camera object
+   - Orthographic projection
+   - Size: 5
+   - Background color: skyblue
+
+2. Player:
+   - GameObject with name "Player"
+   - Transform position at bottom of screen
+   - SpriteRenderer with simple character sprite
+   - PlayerController script attached
+   - Ball spawn point as child object
+
+3. Ground:
+   - GameObject with name "Ground"
+   - Transform stretched across bottom of screen
+   - BoxCollider2D for collision with balls
+   - SpriteRenderer with ground texture
+
+4. Game Manager:
+   - Empty GameObject with name "GameManager"
+   - GameManager script attached
+
+5. Audio Manager:
+   - Empty GameObject with name "AudioManager"
+   - AudioManager script attached
+
+6. UI Canvas:
+   - Canvas with ScreenSpace Overlay render mode
+   - Contains:
+     - Start Panel (Title, Start Button)
+     - Game Panel (Score Text, Balls Remaining Text, Throw Power Slider)
+     - Game Over Panel (Final Score Text, Restart Button)
+   - UIManager script attached
+
+7. EventSystem:
+   - Required for UI interaction
+*/
+
+// To create this scene in Unity:
+// 1. Create a new scene
+// 2. Set up the hierarchy as described above
+// 3. Attach the appropriate scripts to each GameObject
+// 4. Configure the components in the Inspector

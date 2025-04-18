@@ -1,0 +1,20 @@
+// This is a Unity prefab definition. In an actual Unity project, prefabs are binary files.
+// Here's a description of what this prefab would contain:
+
+/*
+Target Prefab:
+- GameObject with name "Target"
+- Components:
+  - Transform (position: Vector3(0, 0, 0), rotation: Quaternion.identity, scale: Vector3(1, 1, 1))
+  - SpriteRenderer (sprite: square sprite, color: red)
+  - BoxCollider2D (size: Vector2(1, 1), isTrigger: false)
+  - Rigidbody2D (bodyType: Kinematic, mass: 1, gravityScale: 0)
+  - TargetController script (health: 1, pointValue: 10, wobbleAmount: 0.5, wobbleSpeed: 1, hitColor: red, hitColorDuration: 0.1)
+*/
+
+// To create this prefab in Unity:
+// 1. Create a GameObject (GameObject > 2D Object > Sprite > Square)
+// 2. Add Rigidbody2D component and set to Kinematic
+// 3. Add BoxCollider2D component
+// 4. Add the TargetController script
+// 5. Drag the GameObject to the Project window to create a prefab
