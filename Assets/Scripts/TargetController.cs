@@ -4,92 +4,158 @@ using UnityEngine;
 
 public class TargetController : MonoBehaviour
 {
-    [Header("Target Settings")]
-    public int health = 1;
+    [Header("Target Properties")]
     public int pointValue = 10;
-    public float wobbleAmount = 0.5f;
-    public float wobbleSpeed = 1f;
+    public float spinSpeed = 90f;
+    public float moveDistance = 0f;
+    public float moveSpeed = 1f;
+    public bool randomizeRotation = true;
+    public bool randomizeSize = false;
     
-    [Header("Visual Feedback")]
+    [Header("Effects")]
+    public GameObject explosionPrefab;
+    public ParticleSystem hitParticles;
+    public AudioSource hitAudio;
+    
+    // Visual properties
+    [Header("Visual Settings")]
+    public bool changeColorOnHit = true;
     public Color hitColor = Color.red;
-    public float hitColorDuration = 0.1f;
+    public float flashDuration = 0.2f;
     
-    private SpriteRenderer spriteRenderer;
-    private Color originalColor;
+    // Private variables
     private Vector3 startPosition;
-    private GameManager gameManager;
+    private Vector3 moveDirection;
+    private Renderer targetRenderer;
+    private Material targetMaterial;
+    private Color originalColor;
+    private AudioManager audioManager;
+    
+    private void Awake()
+    {
+        // Get references
+        targetRenderer = GetComponent<Renderer>();
+        
+        if (targetRenderer != null)
+        {
+            targetMaterial = targetRenderer.material;
+            originalColor = targetMaterial.color;
+        }
+    }
     
     private void Start()
     {
-        // Get references
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        gameManager = GameManager.Instance;
+        // Get audio manager
+        audioManager = FindObjectOfType<AudioManager>();
         
-        if (spriteRenderer != null)
-        {
-            originalColor = spriteRenderer.color;
-        }
-        
-        // Save starting position for wobble effect
+        // Save starting position
         startPosition = transform.position;
         
-        // Start wobble animation
-        StartCoroutine(WobbleAnimation());
+        // Randomize initial rotation if enabled
+        if (randomizeRotation)
+        {
+            transform.rotation = Quaternion.Euler(
+                Random.Range(0f, 360f),
+                Random.Range(0f, 360f),
+                Random.Range(0f, 360f)
+            );
+        }
+        
+        // Randomize size if enabled
+        if (randomizeSize)
+        {
+            float randomScale = Random.Range(0.8f, 1.5f);
+            transform.localScale = new Vector3(randomScale, randomScale, randomScale);
+        }
+        
+        // Set random movement direction
+        moveDirection = new Vector3(
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, 1f),
+            0f
+        ).normalized;
     }
     
-    public void TakeDamage(int damageAmount)
+    private void Update()
     {
-        health -= damageAmount;
+        // Rotate the target
+        transform.Rotate(Vector3.up, spinSpeed * Time.deltaTime);
+        
+        // Move the target if movement is enabled
+        if (moveDistance > 0f)
+        {
+            // Calculate new position
+            Vector3 newPosition = startPosition + moveDirection * Mathf.Sin(Time.time * moveSpeed) * moveDistance;
+            
+            // Apply new position
+            transform.position = newPosition;
+        }
+    }
+    
+    // Called when a ball hits the target
+    public void OnHit()
+    {
+        // Show hit effects
+        if (hitParticles != null)
+        {
+            hitParticles.Play();
+        }
+        
+        // Play sound
+        if (audioManager != null)
+        {
+            audioManager.PlayTargetHitSound();
+        }
+        else if (hitAudio != null)
+        {
+            hitAudio.Play();
+        }
         
         // Visual feedback
-        StartCoroutine(HitFeedback());
-        
-        // Check if target is destroyed
-        if (health <= 0)
+        if (changeColorOnHit && targetMaterial != null)
         {
-            // Notify game manager
-            if (gameManager != null)
-            {
-                gameManager.TargetHit(this);
-            }
+            StartCoroutine(FlashColor());
         }
     }
     
-    private IEnumerator HitFeedback()
+    // Get the point value for this target
+    public int GetPointValue()
     {
-        // Change color to hit color
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = hitColor;
-        }
-        
-        // Wait for duration
-        yield return new WaitForSeconds(hitColorDuration);
-        
-        // Change back to original color
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = originalColor;
-        }
+        return pointValue;
     }
     
-    private IEnumerator WobbleAnimation()
+    // Destroy the target
+    public void DestroyTarget()
     {
-        float timeOffset = Random.Range(0f, 2f * Mathf.PI);  // Random starting point
+        // Call OnHit for effects
+        OnHit();
         
-        while (true)
+        // Spawn explosion effect if available
+        if (explosionPrefab != null)
         {
-            // Create a wobble effect
-            float xOffset = Mathf.Sin(Time.time * wobbleSpeed + timeOffset) * wobbleAmount;
-            
-            // Apply to position
-            transform.position = new Vector3(
-                startPosition.x + xOffset,
-                startPosition.y,
-                startPosition.z
-            );
-            
-            yield return null;
+            Instantiate(explosionPrefab, transform.position, Quaternion.identity);
         }
+        
+        // Hide the target immediately
+        if (targetRenderer != null)
+        {
+            targetRenderer.enabled = false;
+        }
+        
+        // Destroy the game object after a small delay
+        Destroy(gameObject, 0.2f);
+    }
+    
+    // Flash the target color when hit
+    private IEnumerator FlashColor()
+    {
+        // Change to hit color
+        targetMaterial.color = hitColor;
+        
+        // Wait for flash duration
+        yield return new WaitForSeconds(flashDuration);
+        
+        // Restore original color
+        targetMaterial.color = originalColor;
     }
 }

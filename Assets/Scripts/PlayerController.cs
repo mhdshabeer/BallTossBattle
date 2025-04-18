@@ -4,112 +4,262 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Player Settings")]
-    public float throwForceMin = 5f;
-    public float throwForceMax = 15f;
-    public float throwAngle = 45f;
-    
-    [Header("Ball Settings")]
-    public GameObject ballPrefab;
-    public Transform ballSpawnPoint;
-    
-    [Header("Throw Controls")]
-    public float chargeRate = 10f;
-    public float currentThrowForce;
-    public bool isCharging = false;
+    [Header("Control Settings")]
+    public float throwStrengthMin = 5f;
+    public float throwStrengthMax = 15f;
+    public float throwChargeSpeed = 5f;
+    public float aimSensitivity = 2f;
     
     [Header("References")]
+    public Transform aimIndicator;
+    public Transform cameraTransform;
+    public LineRenderer trajectoryLine;
+    
+    // Internal state
+    private float currentThrowStrength;
+    private bool isCharging = false;
+    private Vector3 aimDirection;
     private GameManager gameManager;
-    private AudioManager audioManager;
+    private ARManager arManager;
+    private bool isARMode = false;
+    
+    // Touch/drag handling
+    private Vector2 lastTouchPosition;
+    private bool isDragging = false;
     
     private void Start()
     {
-        // Find references if not assigned in inspector
+        // Get references
         gameManager = GameManager.Instance;
-        audioManager = FindObjectOfType<AudioManager>();
+        arManager = FindObjectOfType<ARManager>();
         
         // Initialize
-        currentThrowForce = throwForceMin;
+        aimDirection = transform.forward;
+        currentThrowStrength = throwStrengthMin;
+        
+        // Set starting aim indicator
+        UpdateAimIndicator();
     }
     
     private void Update()
     {
-        // Only accept input if game is started
-        if (!gameManager.isGameStarted || gameManager.isGameOver)
+        // Check if game is active
+        if (gameManager == null || gameManager.currentGameState != GameManager.GameState.Playing)
+        {
             return;
-            
-        // Input handling for mouse/touch
-        HandleInput();
+        }
+        
+        // Update AR mode status
+        isARMode = gameManager.isARMode;
+        
+        // Handle different control schemes based on mode
+        if (isARMode)
+        {
+            HandleARControls();
+        }
+        else
+        {
+            Handle2DControls();
+        }
     }
     
-    private void HandleInput()
+    // 2D Mode controls
+    private void Handle2DControls()
     {
-        // Start charging on mouse down / touch begin
-        if (Input.GetMouseButtonDown(0) && !isCharging)
+        // Mouse input for aiming
+        if (Input.GetMouseButton(1)) // Right mouse button
         {
-            StartCharging();
+            float mouseX = Input.GetAxis("Mouse X") * aimSensitivity;
+            float mouseY = Input.GetAxis("Mouse Y") * aimSensitivity;
+            
+            // Adjust aim direction
+            aimDirection = Quaternion.Euler(-mouseY, mouseX, 0) * aimDirection;
+            
+            // Update aim indicator
+            UpdateAimIndicator();
         }
         
-        // Continue charging while holding
-        if (Input.GetMouseButton(0) && isCharging)
+        // Throw charging with left mouse button
+        if (Input.GetMouseButtonDown(0))
         {
-            ContinueCharging();
+            // Start charging
+            isCharging = true;
+            currentThrowStrength = throwStrengthMin;
         }
         
-        // Release to throw
+        // Charge while holding
+        if (isCharging)
+        {
+            // Increase throw strength
+            currentThrowStrength += throwChargeSpeed * Time.deltaTime;
+            currentThrowStrength = Mathf.Clamp(currentThrowStrength, throwStrengthMin, throwStrengthMax);
+            
+            // Update trajectory
+            UpdateTrajectory();
+        }
+        
+        // Release throw
         if (Input.GetMouseButtonUp(0) && isCharging)
         {
+            // Throw the ball
             ThrowBall();
+            
+            // Reset charging
+            isCharging = false;
+            
+            // Hide trajectory
+            if (trajectoryLine != null)
+            {
+                trajectoryLine.enabled = false;
+            }
         }
     }
     
-    private void StartCharging()
+    // AR Mode controls
+    private void HandleARControls()
     {
-        isCharging = true;
-        currentThrowForce = throwForceMin;
-    }
-    
-    private void ContinueCharging()
-    {
-        // Increase throw force while charging
-        currentThrowForce += chargeRate * Time.deltaTime;
+        // Touch input for AR
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            
+            switch (touch.phase)
+            {
+                case TouchPhase.Began:
+                    // Start touch
+                    lastTouchPosition = touch.position;
+                    isDragging = true;
+                    
+                    // Start charging
+                    isCharging = true;
+                    currentThrowStrength = throwStrengthMin;
+                    break;
+                    
+                case TouchPhase.Moved:
+                    if (isDragging)
+                    {
+                        // Calculate delta
+                        Vector2 touchDelta = touch.position - lastTouchPosition;
+                        lastTouchPosition = touch.position;
+                        
+                        // Use delta for aiming
+                        // In AR we use the AR camera forward direction as base, then offset based on touch
+                        if (cameraTransform != null)
+                        {
+                            aimDirection = cameraTransform.forward;
+                            
+                            // Apply touch delta to adjust aim (horizontal only for simplicity in AR)
+                            float sensitivity = aimSensitivity * 0.02f; // Lower sensitivity for touch
+                            aimDirection = Quaternion.Euler(0, touchDelta.x * sensitivity, 0) * aimDirection;
+                        }
+                        
+                        // Update aim indicator
+                        UpdateAimIndicator();
+                    }
+                    
+                    // Increase throw strength while dragging
+                    if (isCharging)
+                    {
+                        currentThrowStrength += throwChargeSpeed * Time.deltaTime;
+                        currentThrowStrength = Mathf.Clamp(currentThrowStrength, throwStrengthMin, throwStrengthMax);
+                        
+                        // Update trajectory
+                        UpdateTrajectory();
+                    }
+                    break;
+                    
+                case TouchPhase.Ended:
+                case TouchPhase.Canceled:
+                    if (isDragging && isCharging)
+                    {
+                        // Throw the ball
+                        ThrowBall();
+                        
+                        // Reset
+                        isDragging = false;
+                        isCharging = false;
+                        
+                        // Hide trajectory
+                        if (trajectoryLine != null)
+                        {
+                            trajectoryLine.enabled = false;
+                        }
+                    }
+                    break;
+            }
+        }
         
-        // Clamp to max force
-        currentThrowForce = Mathf.Clamp(currentThrowForce, throwForceMin, throwForceMax);
+        // In AR mode, we also allow to place targets on surfaces
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        {
+            // A simple tap (not drag) can place targets in AR mode
+            if (!isDragging && !isCharging)
+            {
+                // Request a hit test for target placement
+                if (arManager != null)
+                {
+                    arManager.RequestARHitTest();
+                }
+            }
+        }
     }
     
+    // Throw the ball with current strength and direction
     private void ThrowBall()
     {
-        if (gameManager.ballsRemaining <= 0)
-            return;
-            
-        // Create a new ball
-        GameObject ball = Instantiate(ballPrefab, ballSpawnPoint.position, Quaternion.identity);
-        
-        // Get rigidbody
-        Rigidbody2D rb = ball.GetComponent<Rigidbody2D>();
-        
-        if (rb != null)
+        if (gameManager != null)
         {
-            // Calculate direction vector with angle
-            float radianAngle = throwAngle * Mathf.Deg2Rad;
-            Vector2 throwDirection = new Vector2(Mathf.Cos(radianAngle), Mathf.Sin(radianAngle));
-            
-            // Apply force
-            rb.AddForce(throwDirection * currentThrowForce, ForceMode2D.Impulse);
-            
-            // Play throw sound
-            if (audioManager != null)
-            {
-                audioManager.PlayThrowSound();
-            }
-            
-            // Update game manager
-            gameManager.UseBall();
+            gameManager.ThrowBall(aimDirection, currentThrowStrength);
+        }
+    }
+    
+    // Update aim indicator position/rotation
+    private void UpdateAimIndicator()
+    {
+        if (aimIndicator != null)
+        {
+            aimIndicator.forward = aimDirection;
+        }
+    }
+    
+    // Update trajectory preview
+    private void UpdateTrajectory()
+    {
+        if (trajectoryLine == null)
+        {
+            return;
         }
         
-        // Reset charging state
-        isCharging = false;
-        currentThrowForce = throwForceMin;
+        // Enable trajectory line
+        trajectoryLine.enabled = true;
+        
+        // Calculate trajectory points
+        const int numPoints = 20;
+        Vector3[] points = new Vector3[numPoints];
+        
+        // Starting position
+        Vector3 startPos = transform.position;
+        Vector3 startVelocity = aimDirection * currentThrowStrength;
+        
+        // Gravity
+        float gravity = Physics.gravity.y;
+        
+        // Time step
+        float timeStep = 0.1f;
+        
+        // Calculate trajectory points
+        for (int i = 0; i < numPoints; i++)
+        {
+            float time = i * timeStep;
+            
+            // Position formula with gravity: p = p0 + v0*t + 0.5*g*t^2
+            points[i] = startPos + 
+                startVelocity * time + 
+                0.5f * Physics.gravity * time * time;
+        }
+        
+        // Set line renderer points
+        trajectoryLine.positionCount = numPoints;
+        trajectoryLine.SetPositions(points);
     }
 }

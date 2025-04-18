@@ -1,36 +1,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Audio;
 
 public class AudioManager : MonoBehaviour
 {
-    [System.Serializable]
-    public class SoundEffect
-    {
-        public string name;
-        public AudioClip clip;
-        [Range(0f, 1f)]
-        public float volume = 1f;
-        [Range(0.5f, 1.5f)]
-        public float pitch = 1f;
-        public bool loop = false;
-        
-        [HideInInspector]
-        public AudioSource source;
-    }
+    [Header("Audio Sources")]
+    public AudioSource musicSource;
+    public AudioSource sfxSource;
+    
+    [Header("Sound Effects")]
+    public AudioClip throwSound;
+    public AudioClip bounceSound;
+    public AudioClip targetHitSound;
+    public AudioClip scoreSound;
+    public AudioClip gameOverSound;
+    public AudioClip buttonClickSound;
+    public AudioClip targetPlacedSound;
+    
+    [Header("Background Music")]
+    public AudioClip menuMusic;
+    public AudioClip gameplayMusic;
+    
+    [Header("Audio Settings")]
+    [Range(0f, 1f)]
+    public float musicVolume = 0.5f;
+    [Range(0f, 1f)]
+    public float sfxVolume = 0.8f;
+    public bool enableMusic = true;
+    public bool enableSFX = true;
     
     // Singleton pattern
     public static AudioManager Instance { get; private set; }
-    
-    [Header("Sound Effects")]
-    public SoundEffect throwSound;
-    public SoundEffect bounceSound;
-    public SoundEffect targetHitSound;
-    public SoundEffect gameStartSound;
-    public SoundEffect gameOverSound;
-    
-    [Header("Background Music")]
-    public SoundEffect backgroundMusic;
     
     private void Awake()
     {
@@ -45,82 +46,173 @@ public class AudioManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-        
-        // Setup audio sources for each sound effect
-        SetupAudioSource(ref throwSound);
-        SetupAudioSource(ref bounceSound);
-        SetupAudioSource(ref targetHitSound);
-        SetupAudioSource(ref gameStartSound);
-        SetupAudioSource(ref gameOverSound);
-        SetupAudioSource(ref backgroundMusic);
-        
-        // Start background music
-        if (backgroundMusic.clip != null)
+    }
+    
+    private void Start()
+    {
+        // Initialize audio sources
+        if (musicSource == null)
         {
-            PlayBackgroundMusic();
+            musicSource = gameObject.AddComponent<AudioSource>();
+            musicSource.loop = true;
+            musicSource.playOnAwake = false;
+        }
+        
+        if (sfxSource == null)
+        {
+            sfxSource = gameObject.AddComponent<AudioSource>();
+            sfxSource.loop = false;
+            sfxSource.playOnAwake = false;
+        }
+        
+        // Set initial volumes
+        UpdateVolumes();
+        
+        // Start playing menu music
+        PlayMenuMusic();
+    }
+    
+    // Volume control
+    public void UpdateVolumes()
+    {
+        if (musicSource != null)
+        {
+            musicSource.volume = enableMusic ? musicVolume : 0f;
+        }
+        
+        if (sfxSource != null)
+        {
+            sfxSource.volume = enableSFX ? sfxVolume : 0f;
         }
     }
     
-    private void SetupAudioSource(ref SoundEffect sound)
+    public void SetMusicVolume(float volume)
     {
-        if (sound.clip == null)
-            return;
-            
-        sound.source = gameObject.AddComponent<AudioSource>();
-        sound.source.clip = sound.clip;
-        sound.source.volume = sound.volume;
-        sound.source.pitch = sound.pitch;
-        sound.source.loop = sound.loop;
+        musicVolume = Mathf.Clamp01(volume);
+        UpdateVolumes();
+        
+        // Save volume setting
+        PlayerPrefs.SetFloat("MusicVolume", musicVolume);
+        PlayerPrefs.Save();
     }
     
+    public void SetSFXVolume(float volume)
+    {
+        sfxVolume = Mathf.Clamp01(volume);
+        UpdateVolumes();
+        
+        // Save volume setting
+        PlayerPrefs.SetFloat("SFXVolume", sfxVolume);
+        PlayerPrefs.Save();
+    }
+    
+    public void ToggleMusic(bool enabled)
+    {
+        enableMusic = enabled;
+        UpdateVolumes();
+        
+        // Save setting
+        PlayerPrefs.SetInt("MusicEnabled", enableMusic ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+    
+    public void ToggleSFX(bool enabled)
+    {
+        enableSFX = enabled;
+        UpdateVolumes();
+        
+        // Save setting
+        PlayerPrefs.SetInt("SFXEnabled", enableSFX ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+    
+    // Music playback
+    public void PlayMenuMusic()
+    {
+        if (menuMusic != null && musicSource != null)
+        {
+            if (musicSource.clip != menuMusic)
+            {
+                musicSource.clip = menuMusic;
+                
+                if (enableMusic)
+                {
+                    musicSource.Play();
+                }
+            }
+        }
+    }
+    
+    public void PlayGameplayMusic()
+    {
+        if (gameplayMusic != null && musicSource != null)
+        {
+            if (musicSource.clip != gameplayMusic)
+            {
+                musicSource.clip = gameplayMusic;
+                
+                if (enableMusic)
+                {
+                    musicSource.Play();
+                }
+            }
+        }
+    }
+    
+    // Sound effect methods
     public void PlayThrowSound()
     {
-        PlaySound(throwSound);
+        PlaySFX(throwSound);
     }
     
     public void PlayBounceSound()
     {
-        PlaySound(bounceSound);
+        PlaySFX(bounceSound);
     }
     
     public void PlayTargetHitSound()
     {
-        PlaySound(targetHitSound);
+        PlaySFX(targetHitSound);
     }
     
-    public void PlayGameStartSound()
+    public void PlayScoreSound()
     {
-        PlaySound(gameStartSound);
+        PlaySFX(scoreSound);
     }
     
     public void PlayGameOverSound()
     {
-        PlaySound(gameOverSound);
+        PlaySFX(gameOverSound);
     }
     
-    public void PlayBackgroundMusic()
+    public void PlayButtonClickSound()
     {
-        if (backgroundMusic.source != null && !backgroundMusic.source.isPlaying)
+        PlaySFX(buttonClickSound);
+    }
+    
+    public void PlayTargetPlacedSound()
+    {
+        PlaySFX(targetPlacedSound);
+    }
+    
+    // Generic method to play a sound effect
+    private void PlaySFX(AudioClip clip)
+    {
+        if (clip != null && sfxSource != null && enableSFX)
         {
-            backgroundMusic.source.Play();
+            sfxSource.PlayOneShot(clip, sfxVolume);
         }
     }
     
-    public void StopBackgroundMusic()
+    // Load saved audio settings
+    private void LoadAudioSettings()
     {
-        if (backgroundMusic.source != null)
-        {
-            backgroundMusic.source.Stop();
-        }
-    }
-    
-    private void PlaySound(SoundEffect sound)
-    {
-        if (sound.source != null && sound.clip != null)
-        {
-            // Randomize pitch slightly for variety
-            sound.source.pitch = sound.pitch * Random.Range(0.9f, 1.1f);
-            sound.source.Play();
-        }
+        musicVolume = PlayerPrefs.GetFloat("MusicVolume", 0.5f);
+        sfxVolume = PlayerPrefs.GetFloat("SFXVolume", 0.8f);
+        enableMusic = PlayerPrefs.GetInt("MusicEnabled", 1) == 1;
+        enableSFX = PlayerPrefs.GetInt("SFXEnabled", 1) == 1;
+        
+        // Apply loaded settings
+        UpdateVolumes();
     }
 }

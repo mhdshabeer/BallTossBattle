@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Ball Toss Game</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+  </head>
+  <body>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-footer">
+        <div id="unity-webgl-logo"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">AR Ball Toss Game</div>
+      </div>
+    </div>
+
+    <!-- AR DOM Overlay - used for UI elements in AR mode -->
+    <div id="ar-overlay" style="display: none;">
+      <div id="ar-instructions">
+        Point your camera at a flat surface and tap to place targets
+      </div>
+      <button id="ar-exit-button">Exit AR</button>
+    </div>
+
+    <script>
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/WebGLBuild.loader.js";
+      var config = {
+        dataUrl: buildUrl + "/WebGLBuild.data",
+        frameworkUrl: buildUrl + "/WebGLBuild.framework.js",
+        codeUrl: buildUrl + "/WebGLBuild.wasm",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "AR Ball Toss Game",
+        productVersion: "0.1",
+      };
+
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+
+      // Mobile device style adjustments
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        container.className = "unity-mobile";
+        config.devicePixelRatio = 1;
+      }
+
+      loadingBar.style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBarFull.style.width = 100 * progress + "%";
+        }).then((unityInstance) => {
+          loadingBar.style.display = "none";
+          window.unityInstance = unityInstance; // Store for WebXR access
+          
+          // Setup AR overlay exit button
+          document.getElementById('ar-exit-button').addEventListener('click', function() {
+            if (window.arSession) {
+              window.arSession.end();
+            }
+          });
+          
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+
+      // Handle fullscreen button
+      fullscreenButton.onclick = () => {
+        unityInstance.SetFullscreen(1);
+      };
+    </script>
+
+    <!-- WebXR feature detection -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if ('xr' in navigator) {
+          navigator.xr.isSessionSupported('immersive-ar')
+            .then(function(supported) {
+              if (!supported) {
+                document.body.classList.add('ar-not-supported');
+                console.log('WebXR AR not supported in this browser');
+              } else {
+                document.body.classList.add('ar-supported');
+                console.log('WebXR AR is supported');
+              }
+            });
+        } else {
+          document.body.classList.add('webxr-not-supported');
+          console.log('WebXR not supported in this browser');
+        }
+      });
+    </script>
+
+    <style>
+      #ar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 999;
+      }
+      
+      #ar-instructions {
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+        pointer-events: none;
+      }
+      
+      #ar-exit-button {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        pointer-events: auto;
+      }
+      
+      body.webxr-not-supported .ar-only,
+      body.ar-not-supported .ar-only {
+        display: none !important;
+      }
+    </style>
+  </body>
+</html>
